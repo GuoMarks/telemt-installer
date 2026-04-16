@@ -2,28 +2,58 @@
 
 set -e
 
-echo "===== TeleMT One-Click Installer ====="
+echo "===== TeleMT Auto-Port Installer ====="
 
-# 更新系统
+# =========================
+# 0. Root check
+# =========================
+if [ "$EUID" -ne 0 ]; then
+  echo "[ERROR] Please run as root: sudo bash install.sh"
+  exit 1
+fi
+
+# =========================
+# 1. Dependencies
+# =========================
 apt update -y
 apt install -y wget tar openssl ufw curl
 
-# 下载 telemt
+# =========================
+# 2. Detect port (AUTO SWITCH)
+# =========================
+PORT=443
+
+if ss -tlnp | grep -q ':443'; then
+  echo "[WARN] 443 is in use, switching to 8443"
+  PORT=8443
+fi
+
+# =========================
+# 3. Download TeleMT
+# =========================
 cd /usr/local/bin
-wget -q https://github.com/telemt/telemt/releases/latest/download/telemt-aarch64-linux-gnu.tar.gz
+
+URL="https://github.com/telemt/telemt/releases/latest/download/telemt-aarch64-linux-gnu.tar.gz"
+
+wget -q --show-progress --tries=3 --timeout=10 "$URL"
+
+if [ ! -f telemt-aarch64-linux-gnu.tar.gz ]; then
+  echo "[ERROR] Download failed"
+  exit 1
+fi
 
 tar -zxvf telemt-aarch64-linux-gnu.tar.gz
 chmod +x telemt
 rm -f telemt-aarch64-linux-gnu.tar.gz
 
-# 配置目录
+# =========================
+# 4. Config
+# =========================
 mkdir -p /etc/telemt
 
-# 生成 secret
 SECRET=$(openssl rand -hex 16)
 
-# 写配置
-cat > /etc/telemt/config.toml << EOF
+cat > /etc/telemt/config.toml <<EOF
 [general]
 log_level = "silent"
 
@@ -31,7 +61,7 @@ log_level = "silent"
 tls = true
 
 [server]
-port = 443
+port = $PORT
 
 [[server.listeners]]
 ip = "0.0.0.0"
@@ -43,23 +73,28 @@ tls_domain = "www.cloudflare.com"
 user1 = "$SECRET"
 EOF
 
-# 防火墙
-ufw default deny incoming
-ufw allow 443
+# =========================
+# 5. Firewall
+# =========================
 ufw allow 22
+ufw allow $PORT
 ufw --force enable
 
-# systemd
-cat > /etc/systemd/system/telemt.service << EOF
+# =========================
+# 6. systemd (auto restart)
+# =========================
+cat > /etc/systemd/system/telemt.service <<EOF
 [Unit]
-Description=TeleMT Proxy
+Description=TeleMT Proxy Service
 After=network.target
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/telemt /etc/telemt/config.toml
+
 Restart=always
 RestartSec=3
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target
@@ -67,15 +102,25 @@ EOF
 
 systemctl daemon-reload
 systemctl enable telemt
-systemctl start telemt
+systemctl restart telemt
 
+# =========================
+# 7. Output
+# =========================
 sleep 2
 
 IP=$(curl -s ifconfig.me)
 
 echo ""
-echo "===== INSTALL COMPLETE ====="
+echo "=============================="
+echo " INSTALL SUCCESS"
+echo "=============================="
+echo ""
+echo "Used Port: $PORT"
 echo ""
 echo "Telegram Proxy Link:"
-echo "tg://proxy?server=$IP&port=443&secret=ee$SECRET"
+echo "tg://proxy?server=$IP&port=$PORT&secret=ee$SECRET"
+echo ""
+echo "Service:"
+echo "systemctl status telemt"
 echo ""
