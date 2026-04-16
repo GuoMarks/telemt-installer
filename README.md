@@ -19,3 +19,4 @@
 ## 第一步：下载脚本
 ```bash
 curl -s https://raw.githubusercontent.com/GuoMarks/telemt-installer/main/install.sh -o install.sh
+第二步：检查脚本（推荐）
