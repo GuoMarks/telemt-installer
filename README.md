@@ -15,6 +15,12 @@
 
 适用于：
 Ubuntu / Debian / Oracle Linux / ARM / x86 服务器
+查看状态
+systemctl status telemt
+重启服务
+systemctl restart telemt
+查看日志
+journalctl -u telemt -f
 
 ---
 
