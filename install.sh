@@ -111,6 +111,9 @@ sleep 2
 
 IP=$(curl -s ifconfig.me)
 
+# TLS domain hex encode
+DOMAIN_HEX=$(echo -n "www.cloudflare.com" | xxd -p)
+
 echo ""
 echo "=============================="
 echo " INSTALL SUCCESS"
@@ -119,7 +122,8 @@ echo ""
 echo "Used Port: $PORT"
 echo ""
 echo "Telegram Proxy Link:"
-echo "tg://proxy?server=$IP&port=$PORT&secret=ee$SECRET"
+echo ""
+echo "tg://proxy?server=$IP&port=$PORT&secret=ee${SECRET}${DOMAIN_HEX}"
 echo ""
 echo "Service:"
 echo "systemctl status telemt"
